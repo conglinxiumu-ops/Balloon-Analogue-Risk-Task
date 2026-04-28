@@ -2283,10 +2283,10 @@
     $('#sideColor').style.color     = t.color;
     $('#sideColorDesc').textContent = '未知爆炸临界';
 
-    // 气球外观
+    // 气球外观（注意：不要设置 inline display，否则会覆盖 .exploded 的隐藏规则）
     const stage = $('#balloonStage');
     stage.classList.remove('exploded', 'stage-shake');
-    $('#balloonWrap').style.display = 'block';
+    $('#balloonWrap').style.removeProperty('display');
     $('#balloonWrap').style.transform = 'scale(' + CONFIG.INFLATE_BASE_SCALE + ')';
     $('#balloonWrap').style.setProperty('--balloon-scale', 'scale(' + CONFIG.INFLATE_BASE_SCALE + ')');
     $('#bBody').setAttribute('fill', t.color);
