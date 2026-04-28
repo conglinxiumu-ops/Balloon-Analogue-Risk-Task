@@ -213,7 +213,7 @@ Pleskac, T. J., Wallsten, T. S., Wang, P., & Lejuez, C. W. (2008). Development o
 
 ---
 
-## 🤝 实验联动
+## 🤝 致谢
 
 本项目的设计与文档结构参照了 [Iowa-Gambling-Task](https://github.com/conglinxiumu-ops/Iowa-Gambling-Task) 仓库，两者可作为实验心理学课堂中**风险决策范式**的姊妹工具一同使用。
 
