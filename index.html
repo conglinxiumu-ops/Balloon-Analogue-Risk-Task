@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>THE BALLOON GAMBIT · 气球模拟风险任务</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;500;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  /* =========================================================
+     BART · 气球模拟风险任务
+     设计语言：Editorial Bauhaus —— 奶油底色、衬线大字、
+     三原色（红/黄/蓝）几何视觉
+     ========================================================= */
+
+  :root {
+    /* 主题色 */
+    --bg:        #EDE6D6;   /* 奶油背景 */
+    --bg-deep:   #E4DCC9;
+    --paper:     #F7F2E5;
+    --ink:       #1A1814;   /* 主文字（近黑） */
+    --ink-soft:  #4A453C;
+    --ink-faint: #8B8472;
+    --rule:      #1A1814;
+
+    /* 三原色（气球） */
+    --red:    #D8483A;
+    --yellow: #F2B829;
+    --blue:   #2C5FA8;
+
+    /* 辅助 */
+    --gold:   #B8945C;
+    --green:  #4A8B5C;
+    --shadow: 0 1px 0 rgba(26,24,20,0.08), 0 8px 24px -12px rgba(26,24,20,0.18);
+
+    /* 字体 */
+    --font-display: 'Fraunces', 'Noto Serif SC', serif;
+    --font-body:    'Manrope', 'Noto Sans SC', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', 'Noto Sans SC', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  html, body {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+
+    /* 纸质纹理 —— 通过 SVG noise 叠加 */
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.4) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(184,148,92,0.08) 0%, transparent 60%),
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ----------------------------------------------------------
+     页面切换 ———————————————————————————————————————
+     ---------------------------------------------------------- */
+  .page {
+    display: none;
+    width: 100%;
+    min-height: 100vh;
+    animation: pageIn 0.6s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .page.active { display: block; }
+
+  @keyframes pageIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ----------------------------------------------------------
+     通用：编号角标 / 顶栏 ———————————————————————————————
+     ---------------------------------------------------------- */
+  .corner-mark {
+    position: fixed;
+    top: 28px;
+    left: 32px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    z-index: 50;
+    user-select: none;
+  }
+  .corner-mark::before {
+    content: '';
+    display: inline-block;
+    width: 18px;
+    height: 1px;
+    background: var(--ink);
+    vertical-align: middle;
+    margin-right: 10px;
+  }
+
+  .corner-mark-right {
+    position: fixed;
+    top: 28px;
+    right: 32px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    z-index: 50;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* 音效开关 */
+  .sound-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px 5px 8px;
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, opacity 0.2s ease;
+    line-height: 1;
+  }
+  .sound-toggle:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .sound-toggle:hover .sound-wave span {
+    background: var(--paper);
+  }
+  .sound-toggle.muted {
+    opacity: 0.55;
+  }
+  .sound-toggle.muted .sound-wave {
+    position: relative;
+  }
+  .sound-toggle.muted .sound-wave::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -2px;
+    right: -2px;
+    height: 1.5px;
+    background: currentColor;
+    transform: rotate(-22deg);
+  }
+  .sound-toggle.muted .sound-wave span {
+    animation: none !important;
+    height: 5px !important;
+    opacity: 0.6;
+  }
+
+  /* 三条声波动态条 */
+  .sound-wave {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    width: 14px;
+    height: 12px;
+    justify-content: center;
+  }
+  .sound-wave span {
+    display: block;
+    width: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+  .sound-wave span:nth-child(1) { height: 4px; animation-delay: 0s; }
+  .sound-wave span:nth-child(2) { height: 9px; animation-delay: 0.2s; }
+  .sound-wave span:nth-child(3) { height: 6px; animation-delay: 0.4s; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.5); }
+    50%      { transform: scaleY(1.0); }
+  }
+  .sound-toggle.playing .sound-wave span {
+    animation-duration: 0.4s;
+  }
+
+  /* ----------------------------------------------------------
+     页面 1 · WELCOME ———————————————————————————————————
+     ---------------------------------------------------------- */
+  .welcome-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 80px 64px 64px;
+    min-height: 100vh;
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .welcome-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 18px;
+  }
+  .welcome-header .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .welcome-header .meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--ink-faint);
+  }
+
+  .welcome-hero {
+    padding-top: 60px;
+    position: relative;
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(72px, 11vw, 168px);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    font-variation-settings: "opsz" 144, "SOFT" 50;
+  }
+  .hero-title em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--red);
+  }
+  .hero-title-zh {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(28px, 3.5vw, 44px);
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin-top: 18px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .hero-title-zh::after {
+    content: '';
+    flex: 0 0 auto;
+    width: 80px;
+    height: 1px;
+    background: var(--ink);
+  }
+
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 80px;
+    margin-top: 40px;
+    align-items: start;
+  }
+
+  .welcome-copy {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    max-width: 520px;
+  }
+  .welcome-copy p + p { margin-top: 18px; }
+  .welcome-copy strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .welcome-form {
+    background: var(--paper);
+    padding: 36px 36px 32px;
+    border: 1px solid var(--ink);
+    box-shadow: 8px 8px 0 var(--ink);
+    position: relative;
+  }
+  .welcome-form .form-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+  .welcome-form h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 24px;
+    color: var(--ink);
+  }
+  .field-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  .field-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--ink);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    color: var(--ink);
+    letter-spacing: 0.05em;
+    transition: border-color 0.2s;
+  }
+  .field-input::placeholder { color: var(--ink-faint); }
+  .field-input:focus {
+    outline: none;
+    border-bottom-color: var(--red);
+  }
+
+  .field-error {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--red);
+    margin-top: 8px;
+    min-height: 16px;
+    letter-spacing: 0.05em;
+  }
+
+  /* 通用按钮 */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 28px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    border: 1px solid var(--ink);
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+    user-select: none;
+  }
+  .btn:hover {
+    background: var(--red);
+    border-color: var(--red);
+    transform: translate(-2px, -2px);
+  }
+  .btn:active { transform: translate(0, 0); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+  }
+  .btn-ghost:hover {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .btn-arrow::after {
+    content: '→';
+    font-family: var(--font-display);
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+
+  .start-btn {
+    margin-top: 28px;
+    width: 100%;
+    padding: 18px 24px;
+    font-size: 13px;
+  }
+
+  /* 装饰几何 */
+  .deco-shapes {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  .deco-shapes-tr {
+    top: 130px;
+    right: 64px;
+    width: 220px;
+    height: 220px;
+  }
+  .deco-shapes-tr .circle-y {
+    position: absolute;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: var(--yellow);
+    top: 0; left: 30px;
+    animation: floaty 6s ease-in-out infinite;
+  }
+  .deco-shapes-tr .circle-b {
+    position: absolute;
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    background: var(--blue);
+    bottom: 0; right: 0;
+    animation: floaty 6s ease-in-out infinite -3s;
+  }
+  .deco-shapes-tr .circle-r {
+    position: absolute;
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: var(--red);
+    bottom: 60px; left: 0;
+    animation: floaty 6s ease-in-out infinite -1.5s;
+  }
+  @keyframes floaty {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-12px); }
+  }
+
+  .welcome-footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .welcome-footer .footer-cite {
+    max-width: 480px;
+  }
+
+  /* ----------------------------------------------------------
+     页面 2 · INSTRUCTIONS ———————————————————————————————
+     ---------------------------------------------------------- */
+  .instr-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 80px 64px 64px;
+  }
+
+  .instr-header {
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .instr-header .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .instr-title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-style: italic;
+    font-size: clamp(56px, 8vw, 110px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-top: 32px;
+    margin-bottom: 12px;
+  }
+  .instr-subtitle {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-bottom: 60px;
+  }
+
+  .instr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 48px;
+    margin-bottom: 60px;
+  }
+  .instr-card {
+    border-top: 2px solid var(--ink);
+    padding-top: 24px;
+    position: relative;
+  }
+  .instr-card .step-num {
+    font-family: var(--font-display);
+    font-size: 80px;
+    font-weight: 300;
+    line-height: 1;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .instr-card .step-num em {
+    font-style: italic;
+  }
+  .instr-card .step-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    line-height: 1.25;
+  }
+  .instr-card .step-desc {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+  }
+  .instr-card.color-r .step-num { color: var(--red); }
+  .instr-card.color-y .step-num { color: var(--yellow); }
+  .instr-card.color-b .step-num { color: var(--blue); }
+
+  /* 气球类型预览 */
+  .balloon-types {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 40px 48px;
+    margin-bottom: 60px;
+  }
+  .balloon-types-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .balloon-types-header h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+  }
+  .balloon-types-header .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .balloon-types-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+  }
+  .balloon-type-card {
+    text-align: center;
+  }
+  .balloon-type-card .preview {
+    height: 100px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .balloon-type-card .preview svg {
+    height: 90px;
+    width: auto;
+  }
+  .balloon-type-card .name {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .balloon-type-card .meta-line {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .instr-warning {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 32px 40px;
+    margin-bottom: 60px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 32px;
+    align-items: center;
+  }
+  .instr-warning .mark {
+    font-family: var(--font-display);
+    font-size: 80px;
+    font-style: italic;
+    line-height: 1;
+    color: var(--yellow);
+  }
+  .instr-warning .copy {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .instr-warning .copy strong {
+    color: var(--yellow);
+    font-weight: 700;
+  }
+
+  .instr-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--ink);
+    padding-top: 24px;
+  }
+  .instr-actions .left {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* ----------------------------------------------------------
+     页面 3 · MAIN TASK ———————————————————————————————————
+     ---------------------------------------------------------- */
+  #task-page { display: none; }
+  #task-page.active {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  .task-hud {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-bottom: 1px solid var(--ink);
+    background: var(--paper);
+  }
+  .hud-cell {
+    padding: 22px 28px;
+    border-right: 1px solid var(--ink);
+    position: relative;
+  }
+  .hud-cell:last-child { border-right: none; }
+  .hud-cell .hud-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+  .hud-cell .hud-value {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .hud-cell .hud-value .unit {
+    font-size: 14px;
+    color: var(--ink-faint);
+    margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .hud-cell .hud-value .small {
+    font-size: 16px;
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+  .hud-cell.balance .hud-value { color: var(--ink); }
+  .hud-cell.last-pos .hud-value { color: var(--green); }
+  .hud-cell.last-neg .hud-value { color: var(--red); }
+
+  .hud-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: var(--ink);
+    transition: width 0.4s cubic-bezier(.2,.7,.2,1);
+  }
+
+  /* 主舞台 */
+  .task-stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    align-items: center;
+    overflow: hidden;
+    padding: 0 48px;
+  }
+
+  .stage-side {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 32px;
+    padding: 40px 0;
+  }
+  .stage-side.left {
+    border-right: 1px dashed rgba(26,24,20,0.15);
+    padding-right: 36px;
+  }
+  .stage-side.right {
+    border-left: 1px dashed rgba(26,24,20,0.15);
+    padding-left: 36px;
+  }
+  .side-block .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+  .side-block .big {
+    font-family: var(--font-display);
+    font-size: 60px;
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    color: var(--ink);
+  }
+  .side-block .big.pumps {
+    font-style: italic;
+    color: var(--red);
+  }
+  .side-block .desc {
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  /* 气球容器 */
+  .balloon-stage {
+    position: relative;
+    height: 100%;
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 40px;
+  }
+
+  .balloon-wrapper {
+    position: relative;
+    transform: scale(1);
+    transition: transform 0.32s cubic-bezier(.34,1.56,.64,1);
+    transform-origin: center bottom;
+    will-change: transform;
+  }
+  .balloon-wrapper.wobble {
+    animation: wobble 0.4s ease;
+  }
+  @keyframes wobble {
+    0%,100% { transform: var(--balloon-scale) rotate(0deg); }
+    25%     { transform: var(--balloon-scale) rotate(-2deg); }
+    75%     { transform: var(--balloon-scale) rotate(2deg); }
+  }
+
+  .balloon-svg {
+    display: block;
+    width: 240px;
+    height: auto;
+    filter: drop-shadow(0 8px 20px rgba(26,24,20,0.18));
+  }
+
+  .balloon-stage.exploded .balloon-wrapper { display: none; }
+
+  /* 爆炸碎片 */
+  .explosion {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    width: 0; height: 0;
+  }
+  .explosion .frag {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: currentColor;
+    border-radius: 50%;
+    opacity: 0;
+  }
+  .explosion.show .frag {
+    animation: fragFly 0.9s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  @keyframes fragFly {
+    0%   { opacity: 1; transform: translate(0,0) scale(1); }
+    80%  { opacity: 1; }
+    100% { opacity: 0; transform: var(--frag-end) scale(0.4); }
+  }
+  .explosion .burst {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 0; height: 0;
+    border: 3px solid currentColor;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+  }
+  .explosion.show .burst {
+    animation: burst 0.55s ease-out forwards;
+  }
+  @keyframes burst {
+    0%   { width: 0; height: 0; opacity: 0.9; border-width: 6px; }
+    100% { width: 320px; height: 320px; opacity: 0; border-width: 1px; }
+  }
+
+  /* "POP!" 文字 */
+  .pop-text {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 96px;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    pointer-events: none;
+    z-index: 10;
+  }
+  .pop-text.show {
+    animation: popText 1.2s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  @keyframes popText {
+    0%   { transform: translate(-50%, -50%) scale(0) rotate(-8deg); opacity: 0; }
+    25%  { transform: translate(-50%, -50%) scale(1.15) rotate(-4deg); opacity: 1; }
+    60%  { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 0; }
+  }
+
+  /* 屏幕震动 */
+  .stage-shake {
+    animation: shake 0.45s ease;
+  }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0); }
+    20%     { transform: translate(-6px, 2px); }
+    40%     { transform: translate(5px, -3px); }
+    60%     { transform: translate(-4px, 3px); }
+    80%     { transform: translate(3px, -2px); }
+  }
+
+  /* 收益飘字 */
+  .float-earn {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, 0);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 64px;
+    color: var(--green);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+  }
+  .float-earn.show {
+    animation: earnRise 1.4s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  @keyframes earnRise {
+    0%   { opacity: 0; transform: translate(-50%, 30px) scale(0.8); }
+    20%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -120px) scale(1); }
+  }
+
+  /* 操作区 */
+  .task-actions {
+    background: var(--paper);
+    border-top: 1px solid var(--ink);
+    padding: 20px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .action-btn {
+    padding: 22px 32px;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    border: 2px solid var(--ink);
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    text-transform: uppercase;
+    user-select: none;
+    position: relative;
+  }
+  .action-btn .zh {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+  .action-btn .key {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+  }
+
+  .action-pump {
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: 6px 6px 0 var(--red);
+  }
+  .action-pump:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 9px 9px 0 var(--red);
+  }
+  .action-pump:active {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 var(--red);
+  }
+  .action-pump:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 6px 6px 0 var(--red);
+  }
+
+  .action-collect {
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 6px 6px 0 var(--green);
+  }
+  .action-collect:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 9px 9px 0 var(--green);
+    background: var(--green);
+    color: var(--paper);
+  }
+  .action-collect:active {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 var(--green);
+  }
+  .action-collect:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 6px 6px 0 var(--green);
+  }
+
+  .action-divider {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.3em;
+    text-align: center;
+  }
+
+  /* ----------------------------------------------------------
+     BLOCK BREAK ————————————————————————————————————————
+     ---------------------------------------------------------- */
+  .break-wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 120px 64px;
+    text-align: center;
+  }
+  .break-wrap .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 32px;
+  }
+  .break-wrap h2 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(56px, 9vw, 120px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+  .break-wrap .interim-balance {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 64px;
+    color: var(--ink);
+    margin: 40px 0;
+    letter-spacing: -0.02em;
+  }
+  .break-wrap .interim-balance .unit {
+    font-size: 28px;
+    color: var(--ink-faint);
+  }
+  .break-wrap p {
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    max-width: 560px;
+    margin: 0 auto 40px;
+  }
+
+  /* ----------------------------------------------------------
+     页面 4 · RESULTS ————————————————————————————————————
+     ---------------------------------------------------------- */
+  .results-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 80px 64px 64px;
+  }
+  .results-header {
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .results-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(64px, 10vw, 140px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    margin: 36px 0 12px;
+  }
+  .results-subtitle {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--ink-soft);
+    margin-bottom: 56px;
+  }
+
+  .results-summary {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 64px;
+    margin-bottom: 64px;
+  }
+
+  .total-display {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 48px 48px 40px;
+    position: relative;
+  }
+  .total-display .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(247,242,229,0.6);
+    margin-bottom: 18px;
+  }
+  .total-display .number {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: 140px;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--yellow);
+  }
+  .total-display .number .unit {
+    font-style: normal;
+    font-size: 36px;
+    color: var(--paper);
+    margin-right: 8px;
+  }
+  .total-display .meta {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(247,242,229,0.2);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+  .total-display .meta .row {
+    display: flex;
+    justify-content: space-between;
+    color: rgba(247,242,229,0.7);
+  }
+  .total-display .meta .row strong {
+    color: var(--paper);
+    font-weight: 500;
+  }
+
+  .key-stats {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+  }
+  .key-stat {
+    border-top: 2px solid var(--ink);
+    padding-top: 16px;
+  }
+  .key-stat .ks-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .key-stat .ks-value {
+    font-family: var(--font-display);
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .key-stat .ks-value em {
+    font-style: italic;
+    color: var(--red);
+  }
+  .key-stat .ks-desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  /* 各色气球详细统计 */
+  .by-color {
+    margin-bottom: 64px;
+  }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .section-header h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+  }
+  .section-header .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .color-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+  }
+  .color-card {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 28px;
+  }
+  .color-card .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .color-card .head .name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .color-card .head .dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .color-card .stats {
+    display: grid;
+    gap: 12px;
+  }
+  .color-card .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(26,24,20,0.15);
+  }
+  .color-card .stat-row:last-child { border-bottom: none; }
+  .color-card .stat-row .k {
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    font-size: 10px;
+  }
+  .color-card .stat-row .v {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* 条形图 */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 64px;
+  }
+  .chart-block {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 32px;
+  }
+  .chart-block h4 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .chart-block .chart-desc {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 24px;
+  }
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 200px;
+    border-bottom: 2px solid var(--ink);
+    padding: 0 16px;
+    gap: 18px;
+  }
+  .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+  }
+  .bar-col .bar {
+    width: 100%;
+    transition: height 1s cubic-bezier(.2,.7,.2,1);
+    height: 0;
+    position: relative;
+  }
+  .bar-col .bar-value {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .bar-col .bar-label {
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .results-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--ink);
+    padding-top: 32px;
+  }
+  .results-actions .left-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    max-width: 480px;
+    line-height: 1.7;
+  }
+  .results-actions .actions-group {
+    display: flex;
+    gap: 16px;
+  }
+
+  /* ----------------------------------------------------------
+     RESPONSIVE ————————————————————————————————————————
+     ---------------------------------------------------------- */
+  @media (max-width: 960px) {
+    .welcome-wrap, .instr-wrap, .results-wrap { padding: 72px 32px 48px; }
+    .welcome-grid, .results-summary { grid-template-columns: 1fr; gap: 36px; }
+    .instr-grid, .balloon-types-grid, .color-stats-grid, .charts-row {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .deco-shapes-tr { display: none; }
+    .task-hud { grid-template-columns: repeat(2, 1fr); }
+    .hud-cell { border-bottom: 1px solid var(--ink); }
+    .task-stage { grid-template-columns: 1fr; padding: 20px; }
+    .stage-side { display: none; }
+    .balloon-svg { width: 180px; }
+    .corner-mark, .corner-mark-right { font-size: 9px; top: 18px; }
+    .corner-mark { left: 20px; }
+    .corner-mark-right { right: 20px; }
+  }
+
+  /* 滚动条美化 */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--ink); }
+
+  /* 选择高亮 */
+  ::selection {
+    background: var(--yellow);
+    color: var(--ink);
+  }
+</style>
+</head>
+<body>
+
+<!-- 角标 -->
+<div class="corner-mark" id="cornerLeft">BART · 2026</div>
+<div class="corner-mark-right" id="cornerRight">
+  <span>EXPERIMENTAL PSYCHOLOGY</span>
+  <button class="sound-toggle" id="soundToggle" type="button" aria-label="切换音效" title="切换音效（M 键）">
+    <span class="sound-wave">
+      <span></span><span></span><span></span>
+    </span>
+    <span class="sound-state">ON</span>
+  </button>
+</div>
+
+<!-- ============================================================
+     页面 1 · WELCOME
+     ============================================================ -->
+<section class="page active" id="welcome-page">
+  <div class="welcome-wrap">
+
+    <header class="welcome-header">
+      <div class="eyebrow">No. 01 / Welcome</div>
+      <div class="meta">A Risk-Taking Paradigm · 风险决策范式</div>
+    </header>
+
+    <div class="welcome-hero">
+      <h1 class="hero-title">The Balloon<br/><em>Gambit</em>.</h1>
+      <div class="hero-title-zh">气球模拟风险任务</div>
+
+      <div class="welcome-grid">
+        <div class="welcome-copy">
+          <p>每一次按下 <strong>充气</strong>，气球会膨胀一点，您的<strong>潜在收益</strong>也会增加 1 元。但请记住——气球会在某个未知的时刻<strong>爆炸</strong>。一旦爆炸，本轮所有积累的收益都将归零。</p>
+          <p>您可以随时点击 <strong>收取</strong>，把当前收益安全地存入账户，开始下一个气球。</p>
+          <p>共有 <strong>30 个</strong>气球（红、黄、蓝三种类型，各 10 个），分两个阶段呈现。请尝试在反复决策中找到属于自己的最佳策略。</p>
+        </div>
+
+        <div class="welcome-form">
+          <div class="form-eyebrow">PARTICIPANT REGISTRATION</div>
+          <h2>请输入<br/>被试编号</h2>
+
+          <label class="field-label" for="participantInput">Participant ID</label>
+          <input
+            type="text"
+            id="participantInput"
+            class="field-input"
+            placeholder="例如 P001 / S2024-13"
+            maxlength="40"
+            autocomplete="off"
+            spellcheck="false" />
+          <div class="field-error" id="idError"></div>
+
+          <button class="btn btn-arrow start-btn" id="toInstructionsBtn">Begin · 进入实验说明</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 装饰几何 -->
+    <div class="deco-shapes deco-shapes-tr" aria-hidden="true">
+      <div class="circle-y"></div>
+      <div class="circle-b"></div>
+      <div class="circle-r"></div>
+    </div>
+
+    <footer class="welcome-footer">
+      <div>BART · Lejuez et al. (2002)</div>
+      <div class="footer-cite">Open-source teaching tool for experimental psychology</div>
+    </footer>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     页面 2 · INSTRUCTIONS
+     ============================================================ -->
+<section class="page" id="instructions-page">
+  <div class="instr-wrap">
+
+    <header class="instr-header">
+      <div class="eyebrow">No. 02 / Instructions</div>
+      <div class="eyebrow" id="participantBadge"></div>
+    </header>
+
+    <h2 class="instr-title">How it works.</h2>
+    <p class="instr-subtitle">实验任务说明</p>
+
+    <div class="instr-grid">
+      <div class="instr-card color-r">
+        <div class="step-num">0<em>1</em></div>
+        <div class="step-title">每按一次<br/>「充气」</div>
+        <div class="step-desc">气球会膨胀一点，您本轮的潜在收益增加 <strong>¥1</strong>。继续充气可以获得更多积分，但风险也会随之增加。</div>
+      </div>
+
+      <div class="instr-card color-y">
+        <div class="step-num">0<em>2</em></div>
+        <div class="step-title">随时<br/>「收取」收益</div>
+        <div class="step-desc">点击 <strong>收取</strong> 按钮，将当前累积的潜在收益安全转入您的账户余额，并自动进入下一个气球。</div>
+      </div>
+
+      <div class="instr-card color-b">
+        <div class="step-num">0<em>3</em></div>
+        <div class="step-title">如果<br/>气球爆炸</div>
+        <div class="step-desc">每个气球都有一个未知的爆炸临界点。一旦充气次数达到该值，气球会立即爆炸，<strong>本轮收益归零</strong>，进入下一个气球。</div>
+      </div>
+    </div>
+
+    <div class="balloon-types">
+      <div class="balloon-types-header">
+        <h3>气球类型</h3>
+        <div class="label">Three Colors · 三种类型</div>
+      </div>
+
+      <div class="balloon-types-grid">
+        <div class="balloon-type-card">
+          <div class="preview">
+            <svg viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="100" cy="110" rx="78" ry="92" fill="#D8483A"/>
+              <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.28)"/>
+              <path d="M88 197 L112 197 L100 215 Z" fill="#D8483A"/>
+              <path d="M100 215 Q92 240 105 254 Q116 268 100 280" fill="none" stroke="#1A1814" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="name">红色气球</div>
+          <div class="meta-line">较小 · 容易爆炸<br/>收益累积慢</div>
+        </div>
+
+        <div class="balloon-type-card">
+          <div class="preview">
+            <svg viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="100" cy="110" rx="78" ry="92" fill="#F2B829"/>
+              <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.32)"/>
+              <path d="M88 197 L112 197 L100 215 Z" fill="#F2B829"/>
+              <path d="M100 215 Q92 240 105 254 Q116 268 100 280" fill="none" stroke="#1A1814" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="name">黄色气球</div>
+          <div class="meta-line">中等大小<br/>风险与收益均衡</div>
+        </div>
+
+        <div class="balloon-type-card">
+          <div class="preview">
+            <svg viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="100" cy="110" rx="78" ry="92" fill="#2C5FA8"/>
+              <ellipse cx="78" cy="78" rx="18" ry="28" fill="rgba(255,255,255,0.28)"/>
+              <path d="M88 197 L112 197 L100 215 Z" fill="#2C5FA8"/>
+              <path d="M100 215 Q92 240 105 254 Q116 268 100 280" fill="none" stroke="#1A1814" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="name">蓝色气球</div>
+          <div class="meta-line">较大 · 不易爆炸<br/>收益累积快</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="instr-warning">
+      <div class="mark">!</div>
+      <div class="copy">
+        三种气球的<strong>具体爆炸概率</strong>不会向您透露。请在实验中通过反复尝试体会差异，找到适合自己的策略。气球出现的顺序在两个阶段内都是<strong>完全随机</strong>的。
+        <br/><br/>
+        快捷键：<strong>空格 / P</strong> = 充气；<strong>回车 / C</strong> = 收取；<strong>M</strong> = 静音切换。
+      </div>
+    </div>
+
+    <div class="instr-actions">
+      <div class="left">No. 02 — Read carefully before proceeding</div>
+      <button class="btn btn-arrow" id="toTaskBtn">Start Experiment · 开始实验</button>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ============================================================
+     页面 3 · TASK (主任务)
+     ============================================================ -->
+<section class="page" id="task-page">
+
+  <!-- 顶部 HUD -->
+  <div class="task-hud">
+    <div class="hud-cell">
+      <div class="hud-label">Participant</div>
+      <div class="hud-value" id="hudPid"><span class="small">—</span></div>
+    </div>
+    <div class="hud-cell">
+      <div class="hud-label">Trial</div>
+      <div class="hud-value"><span id="hudTrial">1</span><span class="unit"> / 30</span></div>
+      <div class="hud-progress" id="hudProgress" style="width:0%"></div>
+    </div>
+    <div class="hud-cell">
+      <div class="hud-label">Block</div>
+      <div class="hud-value"><span id="hudBlock">1</span><span class="unit"> / 2</span></div>
+    </div>
+    <div class="hud-cell balance">
+      <div class="hud-label">Balance · 总余额</div>
+      <div class="hud-value"><span class="unit" style="font-size:18px;color:var(--ink);">¥</span><span id="hudBalance">0</span></div>
+    </div>
+    <div class="hud-cell" id="hudLastCell">
+      <div class="hud-label">Last · 上轮</div>
+      <div class="hud-value" id="hudLast"><span class="small">—</span></div>
+    </div>
+  </div>
+
+  <!-- 主舞台 -->
+  <div class="task-stage" id="taskStage">
+
+    <div class="stage-side left">
+      <div class="side-block">
+        <div class="label">Pumps · 当前充气</div>
+        <div class="big pumps" id="sidePumps">0</div>
+        <div class="desc">本轮已充气次数</div>
+      </div>
+      <div class="side-block">
+        <div class="label">Potential · 潜在收益</div>
+        <div class="big" id="sidePotential">¥0</div>
+        <div class="desc">点击收取即可入账</div>
+      </div>
+    </div>
+
+    <div class="balloon-stage" id="balloonStage">
+      <div class="pop-text" id="popText">Pop!</div>
+      <div class="float-earn" id="floatEarn">+¥0</div>
+      <div class="explosion" id="explosionLayer">
+        <div class="burst"></div>
+      </div>
+
+      <div class="balloon-wrapper" id="balloonWrap">
+        <svg class="balloon-svg" id="balloonSvg" viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg">
+          <ellipse id="bBody"      cx="100" cy="120" rx="78" ry="100" fill="#D8483A"/>
+          <ellipse id="bHighlight" cx="76"  cy="86"  rx="18" ry="30"  fill="rgba(255,255,255,0.3)"/>
+          <path    id="bTie"       d="M88 217 L112 217 L100 235 Z"     fill="#D8483A"/>
+          <path                    d="M100 235 Q92 265 106 280 Q118 295 100 318"
+                                   fill="none" stroke="#1A1814" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="stage-side right">
+      <div class="side-block">
+        <div class="label">Color · 当前类型</div>
+        <div class="big" id="sideColor" style="font-style:italic;">—</div>
+        <div class="desc" id="sideColorDesc">未知爆炸临界</div>
+      </div>
+      <div class="side-block">
+        <div class="label">Outcome Log · 近期记录</div>
+        <div id="sideLog" style="font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);line-height:1.9;letter-spacing:0.05em;max-height:160px;overflow:hidden;">
+          <span style="color:var(--ink-faint);">— 暂无 —</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作区 -->
+  <div class="task-actions">
+    <button class="action-btn action-pump" id="pumpBtn">
+      <span class="key">SPACE / P</span>
+      Pump<span class="zh">充气</span>
+    </button>
+    <div class="action-divider">↑ ↓</div>
+    <button class="action-btn action-collect" id="collectBtn">
+      <span class="key">ENTER / C</span>
+      Collect<span class="zh">收取</span>
+    </button>
+  </div>
+
+</section>
+
+
+<!-- ============================================================
+     BLOCK BREAK
+     ============================================================ -->
+<section class="page" id="break-page">
+  <div class="break-wrap">
+    <div class="eyebrow">— Halftime · 中场休息 —</div>
+    <h2>Take a breath.</h2>
+    <div class="interim-balance"><span class="unit">¥</span><span id="breakBalance">0</span></div>
+    <p>您已完成第一阶段。在第二阶段中，气球出现的顺序会被重新随机化，但游戏规则与刚才完全相同。准备好后，请继续。</p>
+    <button class="btn btn-arrow" id="toBlock2Btn">Continue · 进入第二阶段</button>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     页面 4 · RESULTS
+     ============================================================ -->
+<section class="page" id="results-page">
+  <div class="results-wrap">
+
+    <header class="results-header">
+      <div class="eyebrow">No. 03 / Results</div>
+      <div class="eyebrow" id="resultBadge"></div>
+    </header>
+
+    <h2 class="results-title">Well done.</h2>
+    <p class="results-subtitle">实验结束 · 数据汇总</p>
+
+    <div class="results-summary">
+      <div class="total-display">
+        <div class="label">Final Balance · 最终账户余额</div>
+        <div class="number"><span class="unit">¥</span><span id="finalBalance">0</span></div>
+        <div class="meta">
+          <div class="row"><span>Total Trials</span><strong id="metaTrials">30</strong></div>
+          <div class="row"><span>Total Pumps</span><strong id="metaPumps">0</strong></div>
+          <div class="row"><span>Balloons Popped</span><strong id="metaPopped">0</strong></div>
+          <div class="row"><span>Balloons Collected</span><strong id="metaCollected">0</strong></div>
+        </div>
+      </div>
+
+      <div class="key-stats">
+        <div class="key-stat">
+          <div class="ks-label">Adjusted Avg. Pumps</div>
+          <div class="ks-value"><em id="ksAdjPumps">0.0</em></div>
+          <div class="ks-desc">未爆炸气球上的平均充气次数<br/>—— BART 的核心风险指标</div>
+        </div>
+        <div class="key-stat">
+          <div class="ks-label">Pop Rate</div>
+          <div class="ks-value"><span id="ksPopRate">0%</span></div>
+          <div class="ks-desc">气球爆炸的总比率</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="by-color">
+      <div class="section-header">
+        <h3>By Balloon Color · 分色统计</h3>
+        <div class="label">Color × Risk Profile</div>
+      </div>
+      <div class="color-stats-grid" id="colorStatsGrid">
+        <!-- 由 JS 填充 -->
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-block">
+        <h4>Adjusted Avg. Pumps</h4>
+        <div class="chart-desc">By Color · 分色平均充气次数</div>
+        <div class="bar-chart" id="chart1"></div>
+      </div>
+      <div class="chart-block">
+        <h4>Total Earnings</h4>
+        <div class="chart-desc">By Color · 分色总收益</div>
+        <div class="bar-chart" id="chart2"></div>
+      </div>
+    </div>
+
+    <div class="results-actions">
+      <div class="left-text">数据已就绪 · 点击右侧按钮可下载完整 CSV，包含每次试次记录与汇总统计。</div>
+      <div class="actions-group">
+        <button class="btn btn-ghost" id="restartBtn">Restart · 重新实验</button>
+        <button class="btn btn-arrow" id="exportBtn">Export Data · 导出 CSV</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ============================================================
+     SCRIPT
+     ============================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     实验参数 ———— 可在此处统一调整
+     ============================================================ */
+  const CONFIG = {
+    TOTAL_BALLOONS:     30,         // 总试次
+    BALLOONS_PER_BLOCK: 15,         // 每个 Block 的试次
+    PER_BLOCK_PER_COLOR: 5,         // 每个 Block 每种颜色的气球数
+    POINTS_PER_PUMP:    1,          // 每次充气获得的"潜在"积分
+    INFLATE_BASE_SCALE: 1.0,        // 初始缩放
+    INFLATE_GROWTH:     0.085,      // 缩放增长系数：scale = base + growth * sqrt(pumps)
+    INFLATE_MAX_SCALE:  2.4,        // 最大缩放
+    OUTCOME_DELAY_MS:   1500,       // 爆炸/收取后 → 切换下一个气球的延迟
+  };
+
+  // 三种气球类型：max 表示爆炸临界点的取值上限（含），
+  // 实际临界 k 在 [1, max] 中均匀随机抽取，到达 k 即爆炸
+  const BALLOON_TYPES = {
+    red:    { max: 8,   color: '#D8483A', name: '红色气球',  cn: '红' },
+    yellow: { max: 32,  color: '#F2B829', name: '黄色气球',  cn: '黄' },
+    blue:   { max: 128, color: '#2C5FA8', name: '蓝色气球',  cn: '蓝' },
+  };
+
+  /* ============================================================
+     音频合成器（Web Audio API · 无需任何外部音频文件）
+     ============================================================ */
+  let audioCtx     = null;
+  let soundEnabled = true;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {
+        audioCtx = null;
+        return null;
+      }
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  // 创建一段噪声 buffer，envelope 用指数衰减
+  function makeNoise(duration, decay) {
+    const n   = Math.floor(audioCtx.sampleRate * duration);
+    const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+    const d   = buf.getChannelData(0);
+    const tau = audioCtx.sampleRate * decay;
+    for (let i = 0; i < n; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / tau);
+    }
+    return buf;
+  }
+
+  /**
+   * 充气声 ——— "噗呲"短促气流 + 轻微音高随充气次数递增（增强紧张感）
+   */
+  function playPump(pumpNo) {
+    if (!soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+
+    const t        = ctx.currentTime;
+    const dur      = 0.12;
+    const buf      = makeNoise(dur, 0.025);
+    const noise    = ctx.createBufferSource();
+    noise.buffer   = buf;
+
+    // 带通滤波，截止频率随充气次数上升（封顶）
+    const baseFreq = 720 + Math.min(pumpNo * 24, 1200);
+    const bp       = ctx.createBiquadFilter();
+    bp.type        = 'bandpass';
+    bp.Q.value     = 4;
+    bp.frequency.setValueAtTime(baseFreq, t);
+    bp.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, t + 0.05);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    noise.connect(bp); bp.connect(g); g.connect(ctx.destination);
+    noise.start(t); noise.stop(t + dur);
+
+    // 三角波微"啾"添质感
+    const oscFreq = 240 + Math.min(pumpNo * 9, 380);
+    const osc     = ctx.createOscillator();
+    osc.type      = 'triangle';
+    osc.frequency.setValueAtTime(oscFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(oscFreq * 1.55, t + 0.06);
+
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.04, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.08);
+  }
+
+  /**
+   * 爆炸声 ——— 高频咔嚓 + 大噪声爆裂 + 低频轰鸣
+   */
+  function playPop() {
+    if (!soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+
+    const t = ctx.currentTime;
+
+    // (1) 极短高频咔嚓 —— 给爆炸尖锐的起始
+    const click = ctx.createOscillator();
+    click.type  = 'square';
+    click.frequency.value = 2400;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.18, t);
+    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.018);
+    click.connect(cg); cg.connect(ctx.destination);
+    click.start(t); click.stop(t + 0.022);
+
+    // (2) 大噪声爆裂 —— 频率下扫
+    const dur   = 0.42;
+    const noise = ctx.createBufferSource();
+    noise.buffer = makeNoise(dur, 0.06);
+    const lp    = ctx.createBiquadFilter();
+    lp.type     = 'lowpass';
+    lp.Q.value  = 1;
+    lp.frequency.setValueAtTime(3500, t);
+    lp.frequency.exponentialRampToValueAtTime(220, t + 0.32);
+
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.42, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    noise.connect(lp); lp.connect(ng); ng.connect(ctx.destination);
+    noise.start(t); noise.stop(t + dur);
+
+    // (3) 低频"嘭"——sine 频率从 180Hz 滑到 40Hz
+    const osc  = ctx.createOscillator();
+    osc.type   = 'sine';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.5, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.28);
+  }
+
+  function setSoundEnabled(on) {
+    soundEnabled = on;
+    const btn = document.getElementById('soundToggle');
+    if (btn) {
+      btn.classList.toggle('muted', !on);
+      btn.querySelector('.sound-state').textContent = on ? 'ON' : 'OFF';
+    }
+    if (on) ensureAudio();
+  }
+
+  /* ============================================================
+     状态
+     ============================================================ */
+  const state = {
+    participantId: '',
+    balloons: [],            // [{color,breakpoint,block,index}]
+    currentIdx: 0,
+    currentPumps: 0,
+    locked: false,           // 锁定按钮防止重复点击
+    balance: 0,
+    expStartTs: 0,
+    trialStartTs: 0,
+    trials: [],              // 每个试次的完整记录
+    pumpEvents: [],          // 每次充气的精细记录（trial,pumpNo,t）
+  };
+
+  /* ============================================================
+     工具函数
+     ============================================================ */
+  const $ = (sel) => document.querySelector(sel);
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function buildBalloonSequence() {
+    const out = [];
+    for (let block = 1; block <= 2; block++) {
+      const inBlock = [];
+      Object.keys(BALLOON_TYPES).forEach(color => {
+        const t = BALLOON_TYPES[color];
+        for (let i = 0; i < CONFIG.PER_BLOCK_PER_COLOR; i++) {
+          const breakpoint = Math.floor(Math.random() * t.max) + 1; // [1, max]
+          inBlock.push({ color, breakpoint, block });
+        }
+      });
+      shuffle(inBlock);
+      out.push(...inBlock);
+    }
+    out.forEach((b, i) => b.index = i + 1);
+    return out;
+  }
+
+  /* ============================================================
+     欢迎页 → 说明页
+     ============================================================ */
+  $('#toInstructionsBtn').addEventListener('click', () => {
+    const v = $('#participantInput').value.trim();
+    const errEl = $('#idError');
+    if (!v) {
+      errEl.textContent = '请输入被试编号后继续';
+      $('#participantInput').focus();
+      return;
+    }
+    if (v.length > 40) {
+      errEl.textContent = '编号过长（最多 40 字符）';
+      return;
+    }
+    errEl.textContent = '';
+    state.participantId = v;
+    $('#participantBadge').textContent = 'Participant · ' + v;
+    showPage('instructions-page');
+  });
+
+  $('#participantInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') $('#toInstructionsBtn').click();
+  });
+
+  /* ============================================================
+     说明页 → 主任务
+     ============================================================ */
+  $('#toTaskBtn').addEventListener('click', () => {
+    state.balloons   = buildBalloonSequence();
+    state.currentIdx = 0;
+    state.balance    = 0;
+    state.trials     = [];
+    state.pumpEvents = [];
+    state.expStartTs = Date.now();
+    $('#hudPid').innerHTML = '<span style="font-family:var(--font-mono);font-size:14px;letter-spacing:0.1em;">' + escapeHtml(state.participantId) + '</span>';
+    showPage('task-page');
+    setupBalloon();
+  });
+
+  /* ============================================================
+     主任务：核心逻辑
+     ============================================================ */
+  function setupBalloon() {
+    const b = state.balloons[state.currentIdx];
+    state.currentPumps = 0;
+    state.trialStartTs = Date.now();
+    state.locked = false;
+
+    // 更新 HUD
+    $('#hudTrial').textContent    = (state.currentIdx + 1);
+    $('#hudBlock').textContent    = b.block;
+    $('#hudBalance').textContent  = state.balance;
+    const pct = (state.currentIdx / CONFIG.TOTAL_BALLOONS) * 100;
+    $('#hudProgress').style.width = pct + '%';
+
+    // 侧栏
+    $('#sidePumps').textContent     = '0';
+    $('#sidePotential').textContent = '¥0';
+    const t = BALLOON_TYPES[b.color];
+    $('#sideColor').textContent     = t.cn;
+    $('#sideColor').style.color     = t.color;
+    $('#sideColorDesc').textContent = '未知爆炸临界';
+
+    // 气球外观
+    const stage = $('#balloonStage');
+    stage.classList.remove('exploded', 'stage-shake');
+    $('#balloonWrap').style.display = 'block';
+    $('#balloonWrap').style.transform = 'scale(' + CONFIG.INFLATE_BASE_SCALE + ')';
+    $('#balloonWrap').style.setProperty('--balloon-scale', 'scale(' + CONFIG.INFLATE_BASE_SCALE + ')');
+    $('#bBody').setAttribute('fill', t.color);
+    $('#bTie').setAttribute('fill', t.color);
+
+    // 按钮可用
+    $('#pumpBtn').disabled    = false;
+    $('#collectBtn').disabled = true;  // 第 0 次还没充气，没法收取
+  }
+
+  function updateSidebars() {
+    $('#sidePumps').textContent     = state.currentPumps;
+    $('#sidePotential').textContent = '¥' + (state.currentPumps * CONFIG.POINTS_PER_PUMP);
+  }
+
+  function inflate() {
+    const s = CONFIG.INFLATE_BASE_SCALE + CONFIG.INFLATE_GROWTH * Math.sqrt(state.currentPumps);
+    const scale = Math.min(s, CONFIG.INFLATE_MAX_SCALE);
+    const wrap = $('#balloonWrap');
+    wrap.style.transform = 'scale(' + scale + ')';
+    wrap.style.setProperty('--balloon-scale', 'scale(' + scale + ')');
+    // 短暂晃动
+    wrap.classList.remove('wobble');
+    void wrap.offsetWidth;
+    wrap.classList.add('wobble');
+  }
+
+  function onPump() {
+    if (state.locked) return;
+    const b = state.balloons[state.currentIdx];
+
+    state.currentPumps++;
+    state.pumpEvents.push({
+      trial: state.currentIdx + 1,
+      pumpNo: state.currentPumps,
+      tMs: Date.now() - state.expStartTs,
+    });
+
+    if (state.currentPumps >= b.breakpoint) {
+      // EXPLODE!
+      explode(b);
+    } else {
+      playPump(state.currentPumps);
+      inflate();
+      updateSidebars();
+      $('#collectBtn').disabled = false;
+    }
+  }
+
+  function onCollect() {
+    if (state.locked) return;
+    if (state.currentPumps === 0) return;
+    const b      = state.balloons[state.currentIdx];
+    const earned = state.currentPumps * CONFIG.POINTS_PER_PUMP;
+    state.balance += earned;
+    state.locked   = true;
+
+    state.trials.push({
+      trial: state.currentIdx + 1,
+      block: b.block,
+      color: b.color,
+      breakpoint: b.breakpoint,
+      pumps: state.currentPumps,
+      exploded: false,
+      earned: earned,
+      balanceAfter: state.balance,
+      rtMsSinceStart: Date.now() - state.expStartTs,
+      trialDurationMs: Date.now() - state.trialStartTs,
+    });
+
+    // 更新 HUD
+    $('#hudBalance').textContent = state.balance;
+    setLastDisplay('+¥' + earned, 'pos');
+    pushLog('收取 ' + earned, b.color, true);
+
+    // 收益飘字
+    const fe = $('#floatEarn');
+    fe.textContent = '+¥' + earned;
+    fe.classList.remove('show');
+    void fe.offsetWidth;
+    fe.classList.add('show');
+
+    // 禁用按钮
+    $('#pumpBtn').disabled    = true;
+    $('#collectBtn').disabled = true;
+
+    setTimeout(nextTrial, CONFIG.OUTCOME_DELAY_MS);
+  }
+
+  function explode(b) {
+    state.locked = true;
+    playPop();
+    state.trials.push({
+      trial: state.currentIdx + 1,
+      block: b.block,
+      color: b.color,
+      breakpoint: b.breakpoint,
+      pumps: state.currentPumps,
+      exploded: true,
+      earned: 0,
+      balanceAfter: state.balance,
+      rtMsSinceStart: Date.now() - state.expStartTs,
+      trialDurationMs: Date.now() - state.trialStartTs,
+    });
+
+    // 视觉
+    const stage = $('#balloonStage');
+    stage.classList.add('exploded', 'stage-shake');
+    spawnFragments(BALLOON_TYPES[b.color].color);
+
+    const popText = $('#popText');
+    popText.classList.remove('show');
+    void popText.offsetWidth;
+    popText.classList.add('show');
+
+    setLastDisplay('POP · ¥0', 'neg');
+    pushLog('爆炸 ¥0', b.color, false);
+
+    $('#pumpBtn').disabled    = true;
+    $('#collectBtn').disabled = true;
+
+    setTimeout(nextTrial, CONFIG.OUTCOME_DELAY_MS);
+  }
+
+  function spawnFragments(color) {
+    const layer = $('#explosionLayer');
+    layer.style.color = color;
+    // 移除旧碎片（保留 .burst）
+    layer.querySelectorAll('.frag').forEach(n => n.remove());
+
+    const N = 14;
+    for (let i = 0; i < N; i++) {
+      const f = document.createElement('div');
+      f.className = 'frag';
+      const angle = (Math.PI * 2 * i) / N + Math.random() * 0.3;
+      const dist  = 110 + Math.random() * 90;
+      const x = Math.cos(angle) * dist;
+      const y = Math.sin(angle) * dist - 30; // 略带上抛
+      f.style.setProperty('--frag-end', 'translate(' + x + 'px,' + y + 'px)');
+      f.style.left = '0px';
+      f.style.top  = '0px';
+      // 随机大小
+      const sz = 8 + Math.random() * 12;
+      f.style.width  = sz + 'px';
+      f.style.height = sz + 'px';
+      layer.appendChild(f);
+    }
+    layer.classList.remove('show');
+    void layer.offsetWidth;
+    layer.classList.add('show');
+    setTimeout(() => layer.classList.remove('show'), 1000);
+  }
+
+  function setLastDisplay(text, kind) {
+    const cell = $('#hudLastCell');
+    cell.classList.remove('last-pos', 'last-neg');
+    if (kind === 'pos') cell.classList.add('last-pos');
+    if (kind === 'neg') cell.classList.add('last-neg');
+    $('#hudLast').textContent = text;
+  }
+
+  function pushLog(label, color, isPos) {
+    const log = $('#sideLog');
+    if (log.querySelector('span[style*="ink-faint"]')) log.innerHTML = '';
+    const c   = BALLOON_TYPES[color].color;
+    const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + c + ';margin-right:8px;vertical-align:1px;"></span>';
+    const div = document.createElement('div');
+    div.innerHTML = dot + '<span style="color:' + (isPos ? 'var(--green)' : 'var(--red)') + ';">' + escapeHtml(label) + '</span>';
+    log.insertBefore(div, log.firstChild);
+    while (log.children.length > 6) log.removeChild(log.lastChild);
+  }
+
+  function nextTrial() {
+    state.currentIdx++;
+    if (state.currentIdx >= CONFIG.TOTAL_BALLOONS) {
+      finishExperiment();
+      return;
+    }
+    if (state.currentIdx === CONFIG.BALLOONS_PER_BLOCK) {
+      $('#breakBalance').textContent = state.balance;
+      showPage('break-page');
+      return;
+    }
+    setupBalloon();
+  }
+
+  $('#toBlock2Btn').addEventListener('click', () => {
+    showPage('task-page');
+    setupBalloon();
+  });
+
+  /* 按钮 & 键盘 */
+  $('#pumpBtn').addEventListener('click', onPump);
+  $('#collectBtn').addEventListener('click', onCollect);
+
+  document.addEventListener('keydown', (e) => {
+    // M 键 ——— 任何页面都可切换音效
+    if (e.key && e.key.toLowerCase() === 'm' && !e.target.matches('input,textarea')) {
+      e.preventDefault();
+      setSoundEnabled(!soundEnabled);
+      return;
+    }
+    const taskActive  = document.getElementById('task-page').classList.contains('active');
+    const breakActive = document.getElementById('break-page').classList.contains('active');
+    if (breakActive && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      $('#toBlock2Btn').click();
+      return;
+    }
+    if (!taskActive) return;
+    if (state.locked) return;
+    const k = e.key.toLowerCase();
+    if (k === ' ' || k === 'p') {
+      e.preventDefault();
+      onPump();
+    } else if (k === 'enter' || k === 'c') {
+      e.preventDefault();
+      if (!$('#collectBtn').disabled) onCollect();
+    }
+  });
+
+  /* ============================================================
+     结束实验：展示结果
+     ============================================================ */
+  function finishExperiment() {
+    showPage('results-page');
+    renderResults();
+  }
+
+  function computeStats() {
+    const byColor = {};
+    Object.keys(BALLOON_TYPES).forEach(c => {
+      byColor[c] = {
+        n: 0, popped: 0, collected: 0,
+        sumPumpsAll: 0, sumPumpsAdj: 0,  // adj = 仅未爆炸
+        sumEarned: 0, maxPossiblePumps: BALLOON_TYPES[c].max,
+      };
+    });
+
+    let totalPumps = 0;
+    state.trials.forEach(t => {
+      const s = byColor[t.color];
+      s.n++;
+      s.sumPumpsAll += t.pumps;
+      totalPumps    += t.pumps;
+      if (t.exploded) {
+        s.popped++;
+      } else {
+        s.collected++;
+        s.sumPumpsAdj += t.pumps;
+        s.sumEarned   += t.earned;
+      }
+    });
+
+    return {
+      byColor: byColor,
+      totalPumps: totalPumps,
+      totalPopped:    state.trials.filter(t => t.exploded).length,
+      totalCollected: state.trials.filter(t => !t.exploded).length,
+    };
+  }
+
+  function renderResults() {
+    const s = computeStats();
+    $('#resultBadge').textContent = 'Participant · ' + state.participantId;
+
+    // 总览
+    $('#finalBalance').textContent  = state.balance;
+    $('#metaTrials').textContent    = state.trials.length;
+    $('#metaPumps').textContent     = s.totalPumps;
+    $('#metaPopped').textContent    = s.totalPopped;
+    $('#metaCollected').textContent = s.totalCollected;
+
+    const adjAll = state.trials.filter(t => !t.exploded);
+    const meanAdj = adjAll.length ? (adjAll.reduce((a, t) => a + t.pumps, 0) / adjAll.length) : 0;
+    $('#ksAdjPumps').textContent = meanAdj.toFixed(2);
+    const popRate = state.trials.length ? (s.totalPopped / state.trials.length * 100) : 0;
+    $('#ksPopRate').textContent  = popRate.toFixed(1) + '%';
+
+    // 各色卡片
+    const colorOrder = ['red', 'yellow', 'blue'];
+    const grid = $('#colorStatsGrid');
+    grid.innerHTML = '';
+    colorOrder.forEach(c => {
+      const t = BALLOON_TYPES[c];
+      const ss = s.byColor[c];
+      const adj = ss.collected ? (ss.sumPumpsAdj / ss.collected) : 0;
+      const popPct = ss.n ? (ss.popped / ss.n * 100) : 0;
+      const div = document.createElement('div');
+      div.className = 'color-card';
+      div.innerHTML =
+        '<div class="head">' +
+          '<div class="name">' + t.name + '</div>' +
+          '<div class="dot" style="background:' + t.color + '"></div>' +
+        '</div>' +
+        '<div class="stats">' +
+          '<div class="stat-row"><span class="k">Trials · 试次数</span><span class="v">' + ss.n + '</span></div>' +
+          '<div class="stat-row"><span class="k">Adj. Avg Pumps</span><span class="v">' + adj.toFixed(2) + '</span></div>' +
+          '<div class="stat-row"><span class="k">Popped · 爆炸</span><span class="v">' + ss.popped + '</span></div>' +
+          '<div class="stat-row"><span class="k">Pop Rate</span><span class="v">' + popPct.toFixed(0) + '%</span></div>' +
+          '<div class="stat-row"><span class="k">Earned · 收益</span><span class="v">¥' + ss.sumEarned + '</span></div>' +
+        '</div>';
+      grid.appendChild(div);
+    });
+
+    // 图表
+    drawChart('chart1', colorOrder.map(c => {
+      const ss = s.byColor[c];
+      const adj = ss.collected ? (ss.sumPumpsAdj / ss.collected) : 0;
+      return { label: BALLOON_TYPES[c].cn, value: adj, color: BALLOON_TYPES[c].color, suffix: '' };
+    }));
+    drawChart('chart2', colorOrder.map(c => {
+      const ss = s.byColor[c];
+      return { label: BALLOON_TYPES[c].cn, value: ss.sumEarned, color: BALLOON_TYPES[c].color, suffix: '' };
+    }));
+  }
+
+  function drawChart(id, data) {
+    const max = Math.max(1, ...data.map(d => d.value));
+    const wrap = document.getElementById(id);
+    wrap.innerHTML = '';
+    data.forEach(d => {
+      const col = document.createElement('div');
+      col.className = 'bar-col';
+      col.innerHTML =
+        '<div class="bar" style="background:' + d.color + ';">' +
+          '<span class="bar-value">' + (Number.isInteger(d.value) ? d.value : d.value.toFixed(1)) + d.suffix + '</span>' +
+        '</div>' +
+        '<div class="bar-label">' + d.label + '</div>';
+      wrap.appendChild(col);
+      // 触发动画
+      requestAnimationFrame(() => {
+        col.querySelector('.bar').style.height = (d.value / max * 100) + '%';
+      });
+    });
+  }
+
+  /* ============================================================
+     CSV 导出
+     ============================================================ */
+  $('#exportBtn').addEventListener('click', exportCSV);
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function nowStamp() {
+    const d = new Date();
+    return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate())
+        + '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds());
+  }
+
+  function exportCSV() {
+    const s = computeStats();
+    const rows = [];
+
+    // 主表
+    rows.push([
+      'participant_id','trial','block','balloon_color','breakpoint',
+      'pumps','exploded','earned','balance_after','trial_duration_ms','rt_ms_since_start'
+    ]);
+    state.trials.forEach(t => {
+      rows.push([
+        state.participantId,
+        t.trial, t.block, t.color, t.breakpoint,
+        t.pumps, t.exploded ? 1 : 0, t.earned, t.balanceAfter,
+        t.trialDurationMs, t.rtMsSinceStart
+      ]);
+    });
+
+    // 分隔
+    rows.push([]);
+    rows.push(['# SUMMARY · 汇总（由颜色聚合）']);
+    rows.push(['color','n_trials','n_popped','n_collected','adj_avg_pumps','total_pumps','total_earned']);
+    Object.keys(BALLOON_TYPES).forEach(c => {
+      const ss = s.byColor[c];
+      const adj = ss.collected ? (ss.sumPumpsAdj / ss.collected) : 0;
+      rows.push([c, ss.n, ss.popped, ss.collected, adj.toFixed(3), ss.sumPumpsAll, ss.sumEarned]);
+    });
+
+    rows.push([]);
+    rows.push(['# OVERALL · 总体']);
+    const adjAll = state.trials.filter(t => !t.exploded);
+    const meanAdj = adjAll.length ? (adjAll.reduce((a, t) => a + t.pumps, 0) / adjAll.length) : 0;
+    rows.push(['final_balance', state.balance]);
+    rows.push(['total_trials',  state.trials.length]);
+    rows.push(['total_pumps',   s.totalPumps]);
+    rows.push(['total_popped',  s.totalPopped]);
+    rows.push(['adj_avg_pumps_all', meanAdj.toFixed(3)]);
+    rows.push(['pop_rate',  ((s.totalPopped / state.trials.length) * 100).toFixed(2) + '%']);
+    rows.push(['experiment_start_iso', new Date(state.expStartTs).toISOString()]);
+    rows.push(['experiment_end_iso',   new Date().toISOString()]);
+
+    rows.push([]);
+    rows.push(['# PUMP EVENTS · 每次充气精细记录']);
+    rows.push(['trial','pump_no','t_ms_since_start']);
+    state.pumpEvents.forEach(e => {
+      rows.push([e.trial, e.pumpNo, e.tMs]);
+    });
+
+    const csv = rows.map(r => r.map(escapeCSV).join(',')).join('\r\n');
+    // BOM for Excel UTF-8
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'BART_' + sanitizeForFilename(state.participantId) + '_' + nowStamp() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  function escapeCSV(v) {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (/[,"\r\n]/.test(s)) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function sanitizeForFilename(s) {
+    return String(s).replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 32) || 'anon';
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ============================================================
+     重置
+     ============================================================ */
+  $('#restartBtn').addEventListener('click', () => {
+    if (!confirm('确定要重新开始实验吗？当前数据将被清除（请先导出 CSV）。')) return;
+    state.participantId = '';
+    state.balloons = [];
+    state.currentIdx = 0;
+    state.balance = 0;
+    state.trials = [];
+    state.pumpEvents = [];
+    $('#participantInput').value = '';
+    showPage('welcome-page');
+  });
+
+  /* ============================================================
+     初始化：聚焦输入框 + 音效开关绑定
+     ============================================================ */
+  document.getElementById('soundToggle').addEventListener('click', () => {
+    setSoundEnabled(!soundEnabled);
+  });
+  // 任意首次点击/按键时预热 AudioContext（满足浏览器自动播放策略）
+  const primeAudio = () => {
+    if (soundEnabled) ensureAudio();
+    document.removeEventListener('click', primeAudio);
+    document.removeEventListener('keydown', primeAudio);
+  };
+  document.addEventListener('click',   primeAudio, { once: false });
+  document.addEventListener('keydown', primeAudio, { once: false });
+
+  setTimeout(() => $('#participantInput').focus(), 200);
+
+})();
+</script>
+
+</body>
+</html>
